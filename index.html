@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Attendance Check-In</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="checkin-wrap">
+  <div class="checkin-card">
+    <div class="program-tag" id="programTag">Loading…</div>
+    <h1 id="sessionTitle">Checking for an open session…</h1>
+
+    <div id="statusArea"></div>
+
+    <form id="checkinForm">
+      <input
+        type="text"
+        id="nameInput"
+        class="name-input"
+        placeholder="Type your full name"
+        autocomplete="off"
+        disabled
+      />
+      <button type="submit" class="checkin-btn" id="submitBtn" disabled>
+        Checking session…
+      </button>
+    </form>
+
+    <div class="message" id="messageArea"></div>
+  </div>
+</div>
+
+<script type="module" src="js/checkin.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /sessions/{sessionId} {
+      // Anyone can read session info (needed so the check-in page can find the open session)
+      allow read: if true;
+      // Only a signed-in admin can create, edit, or delete sessions
+      allow create, update, delete: if request.auth != null;
+
+      match /checkins/{checkinId} {
+        // Anyone can read check-ins (used by the admin panel's report,
+        // and by the check-in page's duplicate check)
+        allow read: if true;
+
+        // Anyone can check in, but ONLY while the parent session is
+        // marked open and the current server time is inside its window
+        allow create: if
+          get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'open' &&
+          request.time < get(/databases/$(database)/documents/sessions/$(sessionId)).data.endTime;
+
+        // Only an admin can edit/delete check-ins (used by the merge-names feature)
+        allow update, delete: if request.auth != null;
+      }
+    }
+  }
+}
