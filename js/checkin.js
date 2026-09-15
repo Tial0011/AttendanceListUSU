@@ -1,8 +1,7 @@
-import { db, CLASS_LABEL } from "./firebase.js";
-import {
-  collection, query, where, orderBy, limit, getDocs,
-  addDoc, serverTimestamp, Timestamp
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { CLASS_LABEL } from "./firebase.js";
+import { subscribeSessions, isSessionOpen } from "./services/sessionsService.js";
+import { submitCheckin } from "./services/checkinsService.js";
+import { showToast } from "./components/Toast.js";
 
 const programTag = document.getElementById("programTag");
 const sessionTitle = document.getElementById("sessionTitle");
@@ -11,15 +10,12 @@ const form = document.getElementById("checkinForm");
 const nameInput = document.getElementById("nameInput");
 const submitBtn = document.getElementById("submitBtn");
 const messageArea = document.getElementById("messageArea");
+const card = document.querySelector(".checkin-card");
 
 programTag.textContent = CLASS_LABEL;
 
 let activeSession = null;
 let countdownHandle = null;
-
-function normalizeName(name) {
-  return name.trim().replace(/\s+/g, " ");
-}
 
 function fmtRemaining(ms) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -28,7 +24,13 @@ function fmtRemaining(ms) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function setMessage(text, type = "muted") {
+  messageArea.textContent = text;
+  messageArea.className = `message ${type}`;
+}
+
 function renderClosed(label) {
+  if (countdownHandle) clearInterval(countdownHandle);
   sessionTitle.textContent = label || "No session is open right now";
   statusArea.innerHTML = `<span class="status-pill closed"><span class="dot"></span>Closed</span>`;
   nameInput.disabled = true;
@@ -36,12 +38,20 @@ function renderClosed(label) {
   submitBtn.textContent = "Session closed";
 }
 
+function renderOpen(session) {
+  activeSession = session;
+  sessionTitle.textContent = session.label || "Attendance";
+  nameInput.disabled = false;
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Check In";
+  startCountdown(session.endTime.toMillis());
+}
+
 function startCountdown(endTimeMs) {
   if (countdownHandle) clearInterval(countdownHandle);
   const tick = () => {
     const remaining = endTimeMs - Date.now();
     if (remaining <= 0) {
-      clearInterval(countdownHandle);
       renderClosed("Session just closed");
       return;
     }
@@ -53,103 +63,69 @@ function startCountdown(endTimeMs) {
   countdownHandle = setInterval(tick, 1000);
 }
 
-async function loadActiveSession() {
-  const sessionsRef = collection(db, "sessions");
-  // Pull recent sessions and find one whose time window is currently open.
-  const q = query(sessionsRef, orderBy("startTime", "desc"), limit(5));
-  const snap = await getDocs(q);
-
+function pickOpenSession(sessions) {
   const now = Date.now();
-  let found = null;
-
-  snap.forEach((docSnap) => {
-    if (found) return;
-    const data = docSnap.data();
-    const start = data.startTime?.toMillis?.() ?? 0;
-    const end = data.endTime?.toMillis?.() ?? 0;
-    if (data.status === "open" && now >= start && now < end) {
-      found = { id: docSnap.id, ...data };
-    }
-  });
-
-  if (!found) {
-    renderClosed("No session is open right now");
-    return;
-  }
-
-  activeSession = found;
-  sessionTitle.textContent = found.label || "Attendance";
-  nameInput.disabled = false;
-  submitBtn.disabled = false;
-  submitBtn.textContent = "Check In";
-  startCountdown(found.endTime.toMillis());
+  return sessions.find((s) => isSessionOpen(s, now)) || null;
 }
+
+card.classList.add("fade-in");
+
+// Real-time: reacts instantly if the admin opens/closes a session,
+// no polling needed.
+subscribeSessions(
+  (sessions) => {
+    const open = pickOpenSession(sessions);
+    const wasSameSession = activeSession && open && activeSession.id === open.id;
+
+    if (open && !wasSameSession) {
+      renderOpen(open);
+    } else if (!open) {
+      activeSession = null;
+      renderClosed("No session is open right now");
+    }
+  },
+  () => {
+    sessionTitle.textContent = "Couldn't load session";
+    setMessage("Check your connection and reload the page.", "error");
+  }
+);
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!activeSession) return;
 
   const rawName = nameInput.value;
-  const name = normalizeName(rawName);
-
-  if (!name) {
-    messageArea.textContent = "Please type your name.";
-    messageArea.className = "message error";
+  if (!rawName.trim()) {
+    setMessage("Please type your name.", "error");
     return;
   }
 
   submitBtn.disabled = true;
-  submitBtn.textContent = "Checking in…";
-  messageArea.textContent = "";
+  submitBtn.innerHTML = `<span class="spinner"></span> Checking in…`;
+  setMessage("");
 
   try {
-    // Re-check the session hasn't just closed
-    const endMs = activeSession.endTime.toMillis();
-    if (Date.now() >= endMs) {
+    if (Date.now() >= activeSession.endTime.toMillis()) {
       renderClosed("Session just closed");
-      messageArea.textContent = "This session closed while you were typing.";
-      messageArea.className = "message error";
+      setMessage("This session closed while you were typing.", "error");
       return;
     }
 
-    // Prevent an obvious double check-in for the same name in this session
-    const checkinsRef = collection(db, "sessions", activeSession.id, "checkins");
-    const dupQuery = query(checkinsRef, where("nameLower", "==", name.toLowerCase()));
-    const dupSnap = await getDocs(dupQuery);
+    const result = await submitCheckin(activeSession.id, rawName);
 
-    if (!dupSnap.empty) {
-      messageArea.textContent = `You're already checked in as "${name}".`;
-      messageArea.className = "message muted";
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Check In";
-      return;
+    if (result.duplicate) {
+      setMessage(`You're already checked in as "${result.name}".`, "muted");
+    } else {
+      setMessage(`You're checked in, ${result.name}. ✓`, "success");
+      nameInput.value = "";
     }
-
-    await addDoc(checkinsRef, {
-      name,
-      nameLower: name.toLowerCase(),
-      timestamp: serverTimestamp(),
-    });
-
-    messageArea.textContent = `You're checked in, ${name}. ✓`;
-    messageArea.className = "message success";
-    nameInput.value = "";
   } catch (err) {
     console.error(err);
-    messageArea.textContent = "Something went wrong — please try again.";
-    messageArea.className = "message error";
+    setMessage("Something went wrong — please try again.", "error");
   } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = "Check In";
+    if (activeSession) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Check In";
+    }
   }
 });
-
-loadActiveSession().catch((err) => {
-  console.error(err);
-  renderClosed("Couldn't load session");
-});
-
-// Re-check every 20s in case a session opens/closes while the page is sitting idle
-setInterval(() => {
-  if (!activeSession) loadActiveSession().catch(console.error);
-}, 20000);

@@ -8,101 +8,12 @@
 </head>
 <body>
 
-<!-- LOGIN VIEW -->
-<div class="login-wrap" id="loginView">
-  <div class="login-card">
-    <h2>Admin sign in</h2>
-    <form id="loginForm">
-      <input type="email" id="loginEmail" placeholder="Email" autocomplete="username" required />
-      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required />
-      <button type="submit" class="btn primary" style="width:100%;">Sign in</button>
-    </form>
-    <div class="message error" id="loginError"></div>
+<div id="app">
+  <div class="boot-loader">
+    <span class="spinner big"></span>
   </div>
 </div>
 
-<!-- ADMIN SHELL -->
-<div class="admin-shell" id="adminShell" style="display:none;">
-  <div class="sidebar">
-    <div class="brand">UNIMEDSU</div>
-    <div class="brand-sub">Graphics Design · 14-Day Class</div>
-    <button class="nav-item active" data-view="sessions">Sessions</button>
-    <button class="nav-item" data-view="report">Attendance report</button>
-    <button class="logout" id="logoutBtn">Sign out</button>
-  </div>
-
-  <div class="main">
-
-    <!-- SESSIONS VIEW -->
-    <div id="view-sessions">
-      <h2>Sessions</h2>
-      <div class="subtitle">Create a session and set how long it stays open for check-ins.</div>
-
-      <div class="panel">
-        <div class="panel-header"><h3>New session</h3></div>
-        <form id="newSessionForm" class="form-grid">
-          <div>
-            <label for="sessionLabel">Session label</label>
-            <input type="text" id="sessionLabel" placeholder="e.g. Day 1 — Intro to Layout" required />
-          </div>
-          <div>
-            <label for="sessionDuration">Open for (minutes)</label>
-            <input type="number" id="sessionDuration" min="1" value="30" required />
-          </div>
-          <div>
-            <label for="sessionStart">Starts at</label>
-            <input type="datetime-local" id="sessionStart" required />
-          </div>
-          <div style="display:flex; align-items:flex-end;">
-            <button type="submit" class="btn primary" style="width:100%;">Create session</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="panel" style="margin-top:20px;">
-        <div class="panel-header"><h3>All sessions</h3></div>
-        <ul class="row-list" id="sessionsList">
-          <li class="empty-state">Loading…</li>
-        </ul>
-      </div>
-
-      <div class="panel" id="checkinsPanel" style="display:none; margin-top:20px;">
-        <div class="panel-header">
-          <h3 id="checkinsPanelTitle">Check-ins</h3>
-          <button class="btn small" id="closeCheckinsPanel">Close</button>
-        </div>
-        <ul class="row-list" id="checkinsList"></ul>
-      </div>
-    </div>
-
-    <!-- REPORT VIEW -->
-    <div id="view-report" style="display:none;">
-      <h2>Attendance report</h2>
-      <div class="subtitle" id="reportSubtitle">Across all sessions</div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <h3>By name</h3>
-          <button class="btn small danger" id="mergeBtn" disabled>Merge selected (2)</button>
-        </div>
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th class="checkbox-cell"></th>
-              <th>Name</th>
-              <th>Sessions attended</th>
-            </tr>
-          </thead>
-          <tbody id="reportBody">
-            <tr><td colspan="3" class="empty-state">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<script type="module" src="js/admin.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
